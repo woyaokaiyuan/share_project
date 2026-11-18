@@ -80,4 +80,12 @@
         </if>
     </select>
 
+    <update id="updatePassword">
+        UPDATE sys_user SET password = #{password} WHERE id = #{id}
+    </update>
+
+    <select id="selectPasswordById" resultType="java.lang.String">
+        SELECT password FROM sys_user WHERE id = #{id}
+    </select>
+
 </mapper>

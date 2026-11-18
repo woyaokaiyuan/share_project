@@ -22,3 +22,11 @@ export function updateRole(data: RoleForm): Promise<void> {
 export function deleteRole(id: number): Promise<void> {
   return request.delete(`/role/${id}`)
 }
+
+export function getRolePermissionIds(id: number): Promise<number[]> {
+  return request.get(`/role/${id}/permissions`)
+}
+
+export function assignRolePermissions(id: number, permissionIds: number[]): Promise<void> {
+  return request.put(`/role/${id}/permissions`, { permissionIds })
+}

@@ -42,9 +42,11 @@
           </template>
         </el-table-column>
         <el-table-column prop="createTime" label="创建时间" width="180" />
-        <el-table-column label="操作" width="160" fixed="right">
+        <el-table-column label="操作" width="320" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click="openDialog(row)">编辑</el-button>
+            <el-button link type="warning" @click="openRoleDialog(row)">分配角色</el-button>
+            <el-button link type="info" @click="handleResetPassword(row)">重置密码</el-button>
             <el-button link type="danger" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
@@ -60,6 +62,7 @@
       />
     </el-card>
 
+    <!-- 新增/编辑用户 -->
     <el-dialog v-model="dialogVisible" :title="dialogTitle" width="500px">
       <el-form ref="formRef" :model="form" :rules="rules" label-width="80px">
         <el-form-item label="用户名" prop="username">
@@ -83,6 +86,22 @@
         <el-button type="primary" :loading="submitLoading" @click="submitForm">确定</el-button>
       </template>
     </el-dialog>
+
+    <!-- 分配角色 -->
+    <el-dialog v-model="roleDialogVisible" :title="roleDialogTitle" width="500px">
+      <div v-loading="roleLoading" style="min-height: 200px">
+        <el-checkbox-group v-model="checkedRoleIds" v-if="allRoles.length > 0">
+          <el-checkbox v-for="role in allRoles" :key="role.id" :value="role.id">
+            {{ role.name }}（{{ role.code }}）
+          </el-checkbox>
+        </el-checkbox-group>
+        <el-empty v-else description="暂无角色数据" />
+      </div>
+      <template #footer>
+        <el-button @click="roleDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="roleSubmitLoading" @click="submitRoles">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -90,8 +109,9 @@
 import { nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { Plus, Search, Refresh } from '@element-plus/icons-vue'
-import { createUser, deleteUser, getUserList, updateUser } from '@/api/user'
-import type { SysUser, UserForm, UserQuery } from '@/types'
+import { assignUserRoles, createUser, deleteUser, getUserList, getUserRoleIds, resetUserPassword, updateUser } from '@/api/user'
+import { getRoleList } from '@/api/role'
+import type { SysRole, SysUser, UserForm, UserQuery } from '@/types'
 
 const loading = ref(false)
 const submitLoading = ref(false)
@@ -109,6 +129,15 @@ const rules = reactive<FormRules<UserForm>>({
   nickname: [{ required: true, message: '请输入昵称', trigger: 'blur' }],
   email: [{ type: 'email', message: '请输入正确的邮箱地址', trigger: 'blur' }]
 })
+
+// 分配角色相关
+const roleDialogVisible = ref(false)
+const roleDialogTitle = ref('分配角色')
+const roleLoading = ref(false)
+const roleSubmitLoading = ref(false)
+const currentUserId = ref<string | null>(null)
+const allRoles = ref<SysRole[]>([])
+const checkedRoleIds = ref<number[]>([])
 
 async function loadData() {
   loading.value = true
@@ -175,6 +204,60 @@ async function submitForm() {
     /* 请求拦截器已统一提示错误 */
   } finally {
     submitLoading.value = false
+  }
+}
+
+async function openRoleDialog(row: SysUser) {
+  currentUserId.value = row.id
+  roleDialogTitle.value = `分配角色 - ${row.username}`
+  allRoles.value = []
+  checkedRoleIds.value = []
+  roleDialogVisible.value = true
+  roleLoading.value = true
+  try {
+    const [roleResult, roleIds] = await Promise.all([
+      getRoleList({ name: '', code: '', status: '', page: 1, size: 1000 }),
+      getUserRoleIds(row.id)
+    ])
+    allRoles.value = roleResult.list
+    checkedRoleIds.value = roleIds
+  } catch {
+    /* 请求拦截器已统一提示错误 */
+  } finally {
+    roleLoading.value = false
+  }
+}
+
+async function submitRoles() {
+  if (currentUserId.value == null) return
+  roleSubmitLoading.value = true
+  try {
+    await assignUserRoles(currentUserId.value, checkedRoleIds.value)
+    ElMessage.success('角色分配成功')
+    roleDialogVisible.value = false
+  } catch {
+    /* 请求拦截器已统一提示错误 */
+  } finally {
+    roleSubmitLoading.value = false
+  }
+}
+
+async function handleResetPassword(row: SysUser) {
+  try {
+    await ElMessageBox.confirm(
+      `确认将用户「${row.username}」的密码重置为默认密码 123456？`,
+      '提示',
+      { type: 'warning' }
+    )
+  } catch {
+    return
+  }
+
+  try {
+    await resetUserPassword(row.id)
+    ElMessage.success('密码已重置为 123456')
+  } catch {
+    /* 请求拦截器已统一提示错误 */
   }
 }
 

@@ -6,21 +6,26 @@ import com.luwq.dto.UserQuery;
 import com.luwq.dto.UserSaveRequest;
 import com.luwq.entity.SysUser;
 import com.luwq.mapper.SysUserMapper;
+import com.luwq.mapper.SysUserRoleMapper;
 import com.luwq.service.SysUserService;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Objects;
 
 @Service
 public class SysUserServiceImpl implements SysUserService {
 
-    /** 演示用初始密码，正式环境应接入密码加密与修改密码流程 */
+    /** 默认初始密码 */
     private static final String DEFAULT_PASSWORD = "123456";
 
     private final SysUserMapper userMapper;
+    private final SysUserRoleMapper userRoleMapper;
+    private final PasswordEncoder passwordEncoder;
 
     @Value("${snowflake.worker-id:1}")
     private long workerId;
@@ -30,8 +35,11 @@ public class SysUserServiceImpl implements SysUserService {
 
     private Snowflake snowflake;
 
-    public SysUserServiceImpl(SysUserMapper userMapper) {
+    public SysUserServiceImpl(SysUserMapper userMapper, SysUserRoleMapper userRoleMapper,
+                              PasswordEncoder passwordEncoder) {
         this.userMapper = userMapper;
+        this.userRoleMapper = userRoleMapper;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @PostConstruct
@@ -55,7 +63,7 @@ public class SysUserServiceImpl implements SysUserService {
         SysUser user = new SysUser();
         user.setId(String.valueOf(snowflake.nextId()));
         user.setUsername(username);
-        user.setPassword(DEFAULT_PASSWORD);
+        user.setPassword(passwordEncoder.encode(DEFAULT_PASSWORD));
         user.setNickname(request.getNickname());
         user.setEmail(request.getEmail());
         user.setPhone(request.getPhone());
@@ -91,6 +99,63 @@ public class SysUserServiceImpl implements SysUserService {
     @Transactional(rollbackFor = Exception.class)
     public void delete(String id) {
         userMapper.deleteById(id);
+    }
+
+    @Override
+    public List<Integer> getRoleIds(String userId) {
+        if (userId == null || userId.isBlank() || userMapper.selectById(userId) == null) {
+            throw new IllegalArgumentException("用户不存在");
+        }
+        return userRoleMapper.selectRoleIdsByUserId(userId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void assignRoles(String userId, List<Integer> roleIds) {
+        if (userId == null || userId.isBlank() || userMapper.selectById(userId) == null) {
+            throw new IllegalArgumentException("用户不存在");
+        }
+        // 全量覆盖：先清空旧角色，再插入新角色
+        userRoleMapper.deleteByUserId(userId);
+        if (roleIds == null) {
+            return;
+        }
+        List<Integer> ids = roleIds.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (!ids.isEmpty()) {
+            userRoleMapper.batchInsert(userId, ids);
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void resetPassword(String userId, String password) {
+        if (userId == null || userId.isBlank() || userMapper.selectById(userId) == null) {
+            throw new IllegalArgumentException("用户不存在");
+        }
+        String rawPassword = password == null || password.isBlank() ? DEFAULT_PASSWORD : password;
+        userMapper.updatePassword(userId, passwordEncoder.encode(rawPassword));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void changePassword(String userId, String oldPassword, String newPassword) {
+        if (userId == null || userId.isBlank()) {
+            throw new IllegalArgumentException("用户ID不能为空");
+        }
+        String storedPassword = userMapper.selectPasswordById(userId);
+        if (storedPassword == null) {
+            throw new IllegalArgumentException("用户不存在");
+        }
+        if (oldPassword == null || !passwordEncoder.matches(oldPassword, storedPassword)) {
+            throw new IllegalArgumentException("原密码不正确");
+        }
+        if (newPassword == null || newPassword.isBlank()) {
+            throw new IllegalArgumentException("新密码不能为空");
+        }
+        userMapper.updatePassword(userId, passwordEncoder.encode(newPassword));
     }
 
     private String requireUsername(String username) {

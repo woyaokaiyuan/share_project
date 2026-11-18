@@ -85,3 +85,41 @@ export interface RoleForm {
   description: string
   status: number
 }
+
+export interface SysPermission {
+  id: number
+  name: string
+  code: string
+  parentId: number
+  type: number
+  module: string
+  sort: number
+  status: number
+  createTime: string
+}
+
+export interface PermissionNode extends SysPermission {
+  children: PermissionNode[]
+}
+
+export interface PermissionQuery {
+  name: string
+  code: string
+}
+
+export interface PermissionForm {
+  id?: number
+  name: string
+  code: string
+  parentId: number
+  type: number
+  module: string
+  sort: number
+  status: number
+}
+
+export interface ChangePasswordParams {
+  userId: string
+  oldPassword: string
+  newPassword: string
+}

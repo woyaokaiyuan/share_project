@@ -21,4 +21,8 @@ public interface SysUserMapper {
     int deleteById(@Param("id") String id);
 
     long countByUsername(@Param("username") String username, @Param("excludeId") String excludeId);
+
+    int updatePassword(@Param("id") String id, @Param("password") String password);
+
+    String selectPasswordById(@Param("id") String id);
 }

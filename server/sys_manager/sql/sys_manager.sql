@@ -110,3 +110,10 @@ CREATE TABLE `sys_role_permission` (
   CONSTRAINT `fk_rp_role` FOREIGN KEY (`role_id`) REFERENCES `sys_role` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_rp_permission` FOREIGN KEY (`permission_id`) REFERENCES `sys_permission` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='角色-权限关联表';
+
+
+-- ----------------------------
+-- 6. 初始管理员账号（密码 123456，BCrypt 哈希）
+-- ----------------------------
+INSERT INTO `sys_user` (`id`, `username`, `password`, `nickname`, `email`, `status`, `user_type`, `perm_version`)
+VALUES ('1', 'admin', '$2a$10$qmK0pxz2EegdpBFXemNpd.u1Yz85rmflPLHnTbOdjeeXbMD9pAu36', '系统管理员', 'admin@share.com', 1, 1, 0);

@@ -5,19 +5,23 @@ import com.luwq.dto.RoleQuery;
 import com.luwq.dto.RoleSaveRequest;
 import com.luwq.entity.SysRole;
 import com.luwq.mapper.SysRoleMapper;
+import com.luwq.mapper.SysRolePermissionMapper;
 import com.luwq.service.SysRoleService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Objects;
 
 @Service
 public class SysRoleServiceImpl implements SysRoleService {
 
     private final SysRoleMapper roleMapper;
+    private final SysRolePermissionMapper rolePermissionMapper;
 
-    public SysRoleServiceImpl(SysRoleMapper roleMapper) {
+    public SysRoleServiceImpl(SysRoleMapper roleMapper, SysRolePermissionMapper rolePermissionMapper) {
         this.roleMapper = roleMapper;
+        this.rolePermissionMapper = rolePermissionMapper;
     }
 
     @Override
@@ -68,6 +72,34 @@ public class SysRoleServiceImpl implements SysRoleService {
     @Transactional(rollbackFor = Exception.class)
     public void delete(Integer id) {
         roleMapper.deleteById(id);
+    }
+
+    @Override
+    public List<Integer> getPermissionIds(Integer roleId) {
+        if (roleId == null || roleMapper.selectById(roleId) == null) {
+            throw new IllegalArgumentException("角色不存在");
+        }
+        return rolePermissionMapper.selectPermissionIdsByRoleId(roleId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void assignPermissions(Integer roleId, List<Integer> permissionIds) {
+        if (roleId == null || roleMapper.selectById(roleId) == null) {
+            throw new IllegalArgumentException("角色不存在");
+        }
+        // 全量覆盖：先清空旧授权，再插入新授权
+        rolePermissionMapper.deleteByRoleId(roleId);
+        if (permissionIds == null) {
+            return;
+        }
+        List<Integer> ids = permissionIds.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (!ids.isEmpty()) {
+            rolePermissionMapper.batchInsert(roleId, ids);
+        }
     }
 
     private String requireName(String name) {

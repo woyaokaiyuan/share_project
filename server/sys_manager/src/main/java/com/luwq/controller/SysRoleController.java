@@ -2,6 +2,7 @@ package com.luwq.controller;
 
 import com.luwq.common.ApiResponse;
 import com.luwq.common.PageResult;
+import com.luwq.dto.RolePermissionRequest;
 import com.luwq.dto.RoleQuery;
 import com.luwq.dto.RoleSaveRequest;
 import com.luwq.entity.SysRole;
@@ -14,6 +15,8 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/role")
@@ -45,6 +48,18 @@ public class SysRoleController {
     @DeleteMapping("/{id}")
     public ApiResponse<Void> delete(@PathVariable Integer id) {
         roleService.delete(id);
+        return ApiResponse.ok();
+    }
+
+    @GetMapping("/{id}/permissions")
+    public ApiResponse<List<Integer>> getPermissions(@PathVariable Integer id) {
+        return ApiResponse.ok(roleService.getPermissionIds(id));
+    }
+
+    @PutMapping("/{id}/permissions")
+    public ApiResponse<Void> assignPermissions(@PathVariable Integer id,
+                                               @RequestBody RolePermissionRequest request) {
+        roleService.assignPermissions(id, request.getPermissionIds());
         return ApiResponse.ok();
     }
 }

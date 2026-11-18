@@ -45,9 +45,10 @@
           </template>
         </el-table-column>
         <el-table-column prop="createTime" label="创建时间" width="180" />
-        <el-table-column label="操作" width="160" fixed="right">
+        <el-table-column label="操作" width="240" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click="openDialog(row)">编辑</el-button>
+            <el-button link type="warning" @click="openPermissionDialog(row)">分配权限</el-button>
             <el-button link type="danger" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
@@ -63,6 +64,7 @@
       />
     </el-card>
 
+    <!-- 新增/编辑角色 -->
     <el-dialog v-model="dialogVisible" :title="dialogTitle" width="500px">
       <el-form ref="formRef" :model="form" :rules="rules" label-width="80px">
         <el-form-item label="角色名称" prop="name">
@@ -86,6 +88,26 @@
         <el-button type="primary" :loading="submitLoading" @click="submitForm">确定</el-button>
       </template>
     </el-dialog>
+
+    <!-- 分配权限 -->
+    <el-dialog v-model="permDialogVisible" :title="permDialogTitle" width="500px">
+      <div v-loading="permLoading" style="min-height: 200px">
+        <el-tree
+          v-if="permissionTree.length > 0"
+          ref="permTreeRef"
+          :data="permissionTree"
+          :props="{ label: 'name', children: 'children' }"
+          node-key="id"
+          show-checkbox
+          default-expand-all
+        />
+        <el-empty v-else description="暂无权限数据" />
+      </div>
+      <template #footer>
+        <el-button @click="permDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="permSubmitLoading" @click="submitPermissions">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -93,8 +115,16 @@
 import { nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { Plus, Search, Refresh } from '@element-plus/icons-vue'
-import { createRole, deleteRole, getRoleList, updateRole } from '@/api/role'
-import type { RoleForm, RoleQuery, SysRole } from '@/types'
+import { getPermissionList } from '@/api/permission'
+import {
+  assignRolePermissions,
+  createRole,
+  deleteRole,
+  getRoleList,
+  getRolePermissionIds,
+  updateRole
+} from '@/api/role'
+import type { PermissionNode, RoleForm, RoleQuery, SysPermission, SysRole } from '@/types'
 
 const loading = ref(false)
 const submitLoading = ref(false)
@@ -111,6 +141,52 @@ const rules = reactive<FormRules<RoleForm>>({
   name: [{ required: true, message: '请输入角色名称', trigger: 'blur' }],
   code: [{ required: true, message: '请输入角色编码', trigger: 'blur' }]
 })
+
+// 分配权限相关
+interface PermissionTreeRef {
+  setCheckedKeys: (keys: number[]) => void
+  getCheckedKeys: (leafOnly?: boolean) => (string | number)[]
+  getHalfCheckedKeys: () => (string | number)[]
+}
+
+const permDialogVisible = ref(false)
+const permDialogTitle = ref('分配权限')
+const permLoading = ref(false)
+const permSubmitLoading = ref(false)
+const currentRoleId = ref<number | null>(null)
+const permissionTree = ref<PermissionNode[]>([])
+const permTreeRef = ref<PermissionTreeRef>()
+
+function buildPermissionTree(list: SysPermission[]): PermissionNode[] {
+  const map = new Map<number, PermissionNode>()
+  list.forEach((item) => map.set(item.id, { ...item, children: [] }))
+  const roots: PermissionNode[] = []
+  list.forEach((item) => {
+    const node = map.get(item.id)!
+    const parent = map.get(item.parentId)
+    if (parent && parent.id !== item.id) {
+      parent.children.push(node)
+    } else {
+      roots.push(node)
+    }
+  })
+  return roots
+}
+
+function collectLeafIds(nodes: PermissionNode[]): Set<number> {
+  const leafIds = new Set<number>()
+  const walk = (list: PermissionNode[]) => {
+    list.forEach((node) => {
+      if (node.children && node.children.length > 0) {
+        walk(node.children)
+      } else {
+        leafIds.add(node.id)
+      }
+    })
+  }
+  walk(nodes)
+  return leafIds
+}
 
 async function loadData() {
   loading.value = true
@@ -184,6 +260,46 @@ async function submitForm() {
     /* 请求拦截器已统一提示错误 */
   } finally {
     submitLoading.value = false
+  }
+}
+
+async function openPermissionDialog(row: SysRole) {
+  currentRoleId.value = row.id
+  permDialogTitle.value = `分配权限 - ${row.name}`
+  permissionTree.value = []   // 先清空，让 el-tree 重新挂载，避免残留勾选状态
+  permDialogVisible.value = true
+  permLoading.value = true
+  try {
+    const [permissions, checkedIds] = await Promise.all([
+      getPermissionList({ name: '', code: '' }),
+      getRolePermissionIds(row.id)
+    ])
+    permissionTree.value = buildPermissionTree(permissions)
+    // 数据库可能存有历史父级ID，只保留叶子节点ID，父级全选/半选由 el-tree 自动推导
+    const leafIds = collectLeafIds(permissionTree.value)
+    const checkedLeafIds = checkedIds.filter((id) => leafIds.has(id))
+    await nextTick()
+    permTreeRef.value?.setCheckedKeys(checkedLeafIds)
+  } catch {
+    /* 请求拦截器已统一提示错误 */
+  } finally {
+    permLoading.value = false
+  }
+}
+
+async function submitPermissions() {
+  if (currentRoleId.value == null || !permTreeRef.value) return
+  // 只持久化叶子权限，父级全选/半选由子节点推导，避免状态放大
+  const checkedLeafIds = permTreeRef.value.getCheckedKeys(true) as number[]
+  permSubmitLoading.value = true
+  try {
+    await assignRolePermissions(currentRoleId.value, checkedLeafIds)
+    ElMessage.success('权限分配成功')
+    permDialogVisible.value = false
+  } catch {
+    /* 请求拦截器已统一提示错误 */
+  } finally {
+    permSubmitLoading.value = false
   }
 }
 

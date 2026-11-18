@@ -40,7 +40,7 @@
           >登 录</el-button>
         </el-form-item>
       </el-form>
-      <div class="login-tip">演示模式：任意账号密码即可登录</div>
+      <div class="login-tip">初始账号：admin / 123456</div>
     </div>
   </div>
 </template>

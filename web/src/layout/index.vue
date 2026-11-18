@@ -66,6 +66,7 @@
           <template #dropdown>
             <el-dropdown-menu>
               <el-dropdown-item command="dashboard">首页</el-dropdown-item>
+              <el-dropdown-item command="password">修改密码</el-dropdown-item>
               <el-dropdown-item command="logout" divided>退出登录</el-dropdown-item>
             </el-dropdown-menu>
           </template>
@@ -81,13 +82,32 @@
       </el-main>
     </el-container>
   </el-container>
+
+  <el-dialog v-model="passwordDialogVisible" title="修改密码" width="450px">
+    <el-form ref="passwordFormRef" :model="passwordForm" :rules="passwordRules" label-width="90px">
+      <el-form-item label="原密码" prop="oldPassword">
+        <el-input v-model="passwordForm.oldPassword" type="password" show-password placeholder="请输入原密码" />
+      </el-form-item>
+      <el-form-item label="新密码" prop="newPassword">
+        <el-input v-model="passwordForm.newPassword" type="password" show-password placeholder="请输入新密码" />
+      </el-form-item>
+      <el-form-item label="确认密码" prop="confirmPassword">
+        <el-input v-model="passwordForm.confirmPassword" type="password" show-password placeholder="请再次输入新密码" />
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <el-button @click="passwordDialogVisible = false">取消</el-button>
+      <el-button type="primary" :loading="passwordSubmitLoading" @click="submitPassword">确定</el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, reactive, ref } from 'vue'
 import { useRoute, useRouter, type RouteRecordRaw } from 'vue-router'
-import { ElMessageBox, ElMessage } from 'element-plus'
+import { ElMessageBox, ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { useUserStore, usePermissionStore } from '@/store'
+import { changePassword } from '@/api/user'
 import { siteConfig } from '@/config'
 
 const route = useRoute()
@@ -96,6 +116,29 @@ const userStore = useUserStore()
 const permissionStore = usePermissionStore()
 const isCollapse = ref(false)
 const nickname = computed(() => userStore.nickname)
+
+// 修改密码相关
+const passwordDialogVisible = ref(false)
+const passwordSubmitLoading = ref(false)
+const passwordFormRef = ref<FormInstance>()
+const passwordForm = reactive({ oldPassword: '', newPassword: '', confirmPassword: '' })
+
+const validateConfirm = (_rule: unknown, value: string, callback: (error?: Error) => void) => {
+  if (value !== passwordForm.newPassword) {
+    callback(new Error('两次输入的密码不一致'))
+  } else {
+    callback()
+  }
+}
+
+const passwordRules = reactive<FormRules>({
+  oldPassword: [{ required: true, message: '请输入原密码', trigger: 'blur' }],
+  newPassword: [{ required: true, message: '请输入新密码', trigger: 'blur' }],
+  confirmPassword: [
+    { required: true, message: '请再次输入新密码', trigger: 'blur' },
+    { validator: validateConfirm, trigger: 'blur' }
+  ]
+})
 
 const menuRoutes = computed(() => {
   const list: RouteRecordRaw[] = []
@@ -123,6 +166,8 @@ const breadcrumbs = computed(() =>
 async function handleCommand(command: string) {
   if (command === 'dashboard') {
     router.push('/dashboard')
+  } else if (command === 'password') {
+    openPasswordDialog()
   } else if (command === 'logout') {
     try {
       await ElMessageBox.confirm('确认退出登录？', '提示', { type: 'warning' })
@@ -133,6 +178,41 @@ async function handleCommand(command: string) {
     } catch {
       /* 用户取消 */
     }
+  }
+}
+
+function openPasswordDialog() {
+  passwordForm.oldPassword = ''
+  passwordForm.newPassword = ''
+  passwordForm.confirmPassword = ''
+  passwordDialogVisible.value = true
+  nextTick(() => passwordFormRef.value?.clearValidate())
+}
+
+async function submitPassword() {
+  if (!passwordFormRef.value) return
+  try {
+    await passwordFormRef.value.validate()
+  } catch {
+    return
+  }
+
+  passwordSubmitLoading.value = true
+  try {
+    await changePassword({
+      userId: userStore.userInfo?.id || '',
+      oldPassword: passwordForm.oldPassword,
+      newPassword: passwordForm.newPassword
+    })
+    ElMessage.success('密码修改成功，请重新登录')
+    passwordDialogVisible.value = false
+    await userStore.logout()
+    permissionStore.routes = []
+    router.push('/login')
+  } catch {
+    /* 请求拦截器已统一提示错误 */
+  } finally {
+    passwordSubmitLoading.value = false
   }
 }
 </script>
