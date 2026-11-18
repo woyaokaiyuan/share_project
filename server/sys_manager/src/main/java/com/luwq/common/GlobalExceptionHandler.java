@@ -14,6 +14,11 @@ public class GlobalExceptionHandler {
         return ApiResponse.fail(400, e.getMessage());
     }
 
+    @ExceptionHandler(ForbiddenException.class)
+    public ApiResponse<Void> handleForbidden(ForbiddenException e) {
+        return ApiResponse.fail(403, e.getMessage());
+    }
+
     @ExceptionHandler(Exception.class)
     public ApiResponse<Void> handleException(Exception e) {
         return ApiResponse.fail(500, "服务器内部错误");

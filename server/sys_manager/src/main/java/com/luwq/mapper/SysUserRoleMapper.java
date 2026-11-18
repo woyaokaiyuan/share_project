@@ -11,4 +11,6 @@ public interface SysUserRoleMapper {
     int deleteByUserId(@Param("userId") String userId);
 
     int batchInsert(@Param("userId") String userId, @Param("roleIds") List<Integer> roleIds);
+
+    List<String> selectUserIdsByRoleId(@Param("roleId") Integer roleId);
 }

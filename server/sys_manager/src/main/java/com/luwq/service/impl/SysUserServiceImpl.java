@@ -2,6 +2,7 @@ package com.luwq.service.impl;
 
 import com.luwq.Snowflake;
 import com.luwq.common.PageResult;
+import com.luwq.common.PermissionCacheStore;
 import com.luwq.dto.UserQuery;
 import com.luwq.dto.UserSaveRequest;
 import com.luwq.entity.SysUser;
@@ -26,6 +27,7 @@ public class SysUserServiceImpl implements SysUserService {
     private final SysUserMapper userMapper;
     private final SysUserRoleMapper userRoleMapper;
     private final PasswordEncoder passwordEncoder;
+    private final PermissionCacheStore permissionCacheStore;
 
     @Value("${snowflake.worker-id:1}")
     private long workerId;
@@ -36,10 +38,11 @@ public class SysUserServiceImpl implements SysUserService {
     private Snowflake snowflake;
 
     public SysUserServiceImpl(SysUserMapper userMapper, SysUserRoleMapper userRoleMapper,
-                              PasswordEncoder passwordEncoder) {
+                              PasswordEncoder passwordEncoder, PermissionCacheStore permissionCacheStore) {
         this.userMapper = userMapper;
         this.userRoleMapper = userRoleMapper;
         this.passwordEncoder = passwordEncoder;
+        this.permissionCacheStore = permissionCacheStore;
     }
 
     @PostConstruct
@@ -127,6 +130,7 @@ public class SysUserServiceImpl implements SysUserService {
         if (!ids.isEmpty()) {
             userRoleMapper.batchInsert(userId, ids);
         }
+        permissionCacheStore.remove(userId);
     }
 
     @Override

@@ -1,9 +1,11 @@
 package com.luwq.service.impl;
 
+import com.luwq.common.PermissionCacheStore;
 import com.luwq.dto.PermissionQuery;
 import com.luwq.dto.PermissionSaveRequest;
 import com.luwq.entity.SysPermission;
 import com.luwq.mapper.SysPermissionMapper;
+import com.luwq.mapper.SysRolePermissionMapper;
 import com.luwq.service.SysPermissionService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,9 +16,15 @@ import java.util.List;
 public class SysPermissionServiceImpl implements SysPermissionService {
 
     private final SysPermissionMapper permissionMapper;
+    private final SysRolePermissionMapper rolePermissionMapper;
+    private final PermissionCacheStore permissionCacheStore;
 
-    public SysPermissionServiceImpl(SysPermissionMapper permissionMapper) {
+    public SysPermissionServiceImpl(SysPermissionMapper permissionMapper,
+                                    SysRolePermissionMapper rolePermissionMapper,
+                                    PermissionCacheStore permissionCacheStore) {
         this.permissionMapper = permissionMapper;
+        this.rolePermissionMapper = rolePermissionMapper;
+        this.permissionCacheStore = permissionCacheStore;
     }
 
     @Override
@@ -81,6 +89,7 @@ public class SysPermissionServiceImpl implements SysPermissionService {
         permission.setSort(request.getSort() == null ? 0 : request.getSort());
         permission.setStatus(request.getStatus() == null ? 1 : request.getStatus());
         permissionMapper.update(permission);
+        clearUsersCacheByPermission(request.getId());
     }
 
     @Override
@@ -89,7 +98,12 @@ public class SysPermissionServiceImpl implements SysPermissionService {
         if (permissionMapper.countChildren(id) > 0) {
             throw new IllegalArgumentException("存在子权限，请先删除子权限");
         }
+        clearUsersCacheByPermission(id);
         permissionMapper.deleteById(id);
+    }
+
+    private void clearUsersCacheByPermission(Integer permissionId) {
+        permissionCacheStore.removeAll(rolePermissionMapper.selectUserIdsByPermissionId(permissionId));
     }
 
     /** 从候选上级一路向上追溯，判断是否会形成环 */

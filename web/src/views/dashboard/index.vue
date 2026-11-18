@@ -16,17 +16,6 @@
 
     <el-card class="welcome-card" style="margin-top: 16px">
       <template #header><span>欢迎使用</span></template>
-      <p>这是基于 Vue3 + Element Plus + Pinia 的后台管理框架，已集成：</p>
-      <ul>
-        <li>登录鉴权与 Token 持久化</li>
-        <li>动态路由与 RBAC 按钮级权限</li>
-        <li>侧边菜单、面包屑、用户下拉</li>
-        <li>axios 请求封装与 401 自动跳转</li>
-      </ul>
-      <p style="color: #909399; font-size: 13px">
-        当前为 Mock 演示模式，配置 <code>.env.development</code> 中
-        <code>VITE_USE_MOCK=false</code> 即可对接 Spring Boot 后端。
-      </p>
     </el-card>
   </div>
 </template>
@@ -65,5 +54,8 @@ const cards = [
   color: #909399;
   font-size: 13px;
   margin-top: 4px;
+}
+.welcome-card :deep(.el-card__body) {
+  padding: 0;
 }
 </style>

@@ -4,7 +4,7 @@
       <template #header>
         <div class="card-header">
           <span>用户管理</span>
-          <el-button type="primary" :icon="Plus" @click="openDialog()">新增用户</el-button>
+          <el-button v-permission="'system:user:add'" type="primary" :icon="Plus" @click="openDialog()">新增用户</el-button>
         </div>
       </template>
 
@@ -44,10 +44,10 @@
         <el-table-column prop="createTime" label="创建时间" width="180" />
         <el-table-column label="操作" width="320" fixed="right">
           <template #default="{ row }">
-            <el-button link type="primary" @click="openDialog(row)">编辑</el-button>
-            <el-button link type="warning" @click="openRoleDialog(row)">分配角色</el-button>
-            <el-button link type="info" @click="handleResetPassword(row)">重置密码</el-button>
-            <el-button link type="danger" @click="handleDelete(row)">删除</el-button>
+            <el-button v-permission="'system:user:edit'" link type="primary" @click="openDialog(row)">编辑</el-button>
+            <el-button v-permission="'system:user:assign'" link type="warning" @click="openRoleDialog(row)">分配角色</el-button>
+            <el-button v-permission="'system:user:resetPwd'" link type="info" @click="handleResetPassword(row)">重置密码</el-button>
+            <el-button v-permission="'system:user:delete'" link type="danger" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>

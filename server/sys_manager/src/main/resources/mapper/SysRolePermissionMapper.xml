@@ -18,4 +18,11 @@
         </foreach>
     </insert>
 
+    <select id="selectUserIdsByPermissionId" resultType="java.lang.String">
+        SELECT DISTINCT ur.user_id
+        FROM sys_user_role ur
+        INNER JOIN sys_role_permission rp ON ur.role_id = rp.role_id
+        WHERE rp.permission_id = #{permissionId}
+    </select>
+
 </mapper>

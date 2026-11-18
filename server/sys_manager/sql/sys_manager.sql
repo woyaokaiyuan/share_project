@@ -117,3 +117,49 @@ CREATE TABLE `sys_role_permission` (
 -- ----------------------------
 INSERT INTO `sys_user` (`id`, `username`, `password`, `nickname`, `email`, `status`, `user_type`, `perm_version`)
 VALUES ('1', 'admin', '$2a$10$qmK0pxz2EegdpBFXemNpd.u1Yz85rmflPLHnTbOdjeeXbMD9pAu36', '系统管理员', 'admin@share.com', 1, 1, 0);
+
+-- ----------------------------
+-- 7. 初始角色与权限数据
+-- ----------------------------
+INSERT INTO `sys_role` (`id`, `name`, `code`, `description`, `status`) VALUES
+  (1, '超级管理员', 'admin', '拥有全部权限', 1),
+  (2, '普通用户', 'normal', '仅可查看，不可修改', 1);
+
+-- 目录
+INSERT INTO `sys_permission` (`id`, `name`, `code`, `parent_id`, `type`, `sort`, `status`) VALUES
+  (1, '系统管理', 'system', 0, 1, 1, 1);
+
+-- 菜单（id 2/3/4）
+INSERT INTO `sys_permission` (`id`, `name`, `code`, `parent_id`, `type`, `sort`, `status`) VALUES
+  (2, '用户管理', 'system:user:list', 1, 2, 1, 1),
+  (3, '角色管理', 'system:role:list', 1, 2, 2, 1),
+  (4, '权限管理', 'system:permission:list', 1, 2, 3, 1);
+
+-- 用户管理按钮（id 5~9）
+INSERT INTO `sys_permission` (`id`, `name`, `code`, `parent_id`, `type`, `sort`, `status`) VALUES
+  (5, '用户新增', 'system:user:add', 2, 3, 1, 1),
+  (6, '用户编辑', 'system:user:edit', 2, 3, 2, 1),
+  (7, '用户删除', 'system:user:delete', 2, 3, 3, 1),
+  (8, '分配角色', 'system:user:assign', 2, 3, 4, 1),
+  (9, '重置密码', 'system:user:resetPwd', 2, 3, 5, 1);
+
+-- 角色管理按钮（id 10~13）
+INSERT INTO `sys_permission` (`id`, `name`, `code`, `parent_id`, `type`, `sort`, `status`) VALUES
+  (10, '角色新增', 'system:role:add', 3, 3, 1, 1),
+  (11, '角色编辑', 'system:role:edit', 3, 3, 2, 1),
+  (12, '角色删除', 'system:role:delete', 3, 3, 3, 1),
+  (13, '分配权限', 'system:role:assign', 3, 3, 4, 1);
+
+-- 权限管理按钮（id 14~16）
+INSERT INTO `sys_permission` (`id`, `name`, `code`, `parent_id`, `type`, `sort`, `status`) VALUES
+  (14, '权限新增', 'system:permission:add', 4, 3, 1, 1),
+  (15, '权限编辑', 'system:permission:edit', 4, 3, 2, 1),
+  (16, '权限删除', 'system:permission:delete', 4, 3, 3, 1);
+
+-- 超级管理员角色拥有全部权限
+INSERT INTO `sys_role_permission` (`role_id`, `permission_id`)
+SELECT 1, `id` FROM `sys_permission`;
+
+-- 普通用户角色仅拥有菜单查看权限
+INSERT INTO `sys_role_permission` (`role_id`, `permission_id`) VALUES
+  (2, 2), (2, 3), (2, 4);

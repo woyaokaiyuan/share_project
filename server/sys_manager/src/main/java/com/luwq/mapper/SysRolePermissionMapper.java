@@ -11,4 +11,6 @@ public interface SysRolePermissionMapper {
     int deleteByRoleId(@Param("roleId") Integer roleId);
 
     int batchInsert(@Param("roleId") Integer roleId, @Param("permissionIds") List<Integer> permissionIds);
+
+    List<String> selectUserIdsByPermissionId(@Param("permissionId") Integer permissionId);
 }

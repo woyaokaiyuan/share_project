@@ -1,5 +1,6 @@
 package com.luwq.controller;
 
+import com.luwq.annotation.RequirePermission;
 import com.luwq.common.ApiResponse;
 import com.luwq.dto.PermissionQuery;
 import com.luwq.dto.PermissionSaveRequest;
@@ -27,23 +28,27 @@ public class SysPermissionController {
     }
 
     @GetMapping("/list")
+    @RequirePermission("system:permission:list")
     public ApiResponse<List<SysPermission>> list(PermissionQuery query) {
         return ApiResponse.ok(permissionService.list(query));
     }
 
     @PostMapping
+    @RequirePermission("system:permission:add")
     public ApiResponse<Void> create(@RequestBody PermissionSaveRequest request) {
         permissionService.create(request);
         return ApiResponse.ok();
     }
 
     @PutMapping
+    @RequirePermission("system:permission:edit")
     public ApiResponse<Void> update(@RequestBody PermissionSaveRequest request) {
         permissionService.update(request);
         return ApiResponse.ok();
     }
 
     @DeleteMapping("/{id}")
+    @RequirePermission("system:permission:delete")
     public ApiResponse<Void> delete(@PathVariable Integer id) {
         permissionService.delete(id);
         return ApiResponse.ok();

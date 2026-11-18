@@ -1,5 +1,6 @@
 package com.luwq.controller;
 
+import com.luwq.annotation.RequirePermission;
 import com.luwq.common.ApiResponse;
 import com.luwq.common.PageResult;
 import com.luwq.dto.ChangePasswordRequest;
@@ -31,34 +32,40 @@ public class SysUserController {
     }
 
     @GetMapping("/list")
+    @RequirePermission("system:user:list")
     public ApiResponse<PageResult<SysUser>> list(UserQuery query) {
         return ApiResponse.ok(userService.page(query));
     }
 
     @PostMapping
+    @RequirePermission("system:user:add")
     public ApiResponse<Void> create(@RequestBody UserSaveRequest request) {
         userService.create(request);
         return ApiResponse.ok();
     }
 
     @PutMapping
+    @RequirePermission("system:user:edit")
     public ApiResponse<Void> update(@RequestBody UserSaveRequest request) {
         userService.update(request);
         return ApiResponse.ok();
     }
 
     @DeleteMapping("/{id}")
+    @RequirePermission("system:user:delete")
     public ApiResponse<Void> delete(@PathVariable String id) {
         userService.delete(id);
         return ApiResponse.ok();
     }
 
     @GetMapping("/{id}/roles")
+    @RequirePermission("system:user:list")
     public ApiResponse<List<Integer>> getRoles(@PathVariable String id) {
         return ApiResponse.ok(userService.getRoleIds(id));
     }
 
     @PutMapping("/{id}/roles")
+    @RequirePermission("system:user:assign")
     public ApiResponse<Void> assignRoles(@PathVariable String id,
                                          @RequestBody UserRoleRequest request) {
         userService.assignRoles(id, request.getRoleIds());
@@ -66,6 +73,7 @@ public class SysUserController {
     }
 
     @PutMapping("/{id}/password")
+    @RequirePermission("system:user:resetPwd")
     public ApiResponse<Void> resetPassword(@PathVariable String id,
                                            @RequestBody(required = false) ResetPasswordRequest request) {
         userService.resetPassword(id, request == null ? null : request.getPassword());

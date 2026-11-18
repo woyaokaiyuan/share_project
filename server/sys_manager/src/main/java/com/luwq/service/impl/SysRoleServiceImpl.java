@@ -1,11 +1,13 @@
 package com.luwq.service.impl;
 
 import com.luwq.common.PageResult;
+import com.luwq.common.PermissionCacheStore;
 import com.luwq.dto.RoleQuery;
 import com.luwq.dto.RoleSaveRequest;
 import com.luwq.entity.SysRole;
 import com.luwq.mapper.SysRoleMapper;
 import com.luwq.mapper.SysRolePermissionMapper;
+import com.luwq.mapper.SysUserRoleMapper;
 import com.luwq.service.SysRoleService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,10 +20,15 @@ public class SysRoleServiceImpl implements SysRoleService {
 
     private final SysRoleMapper roleMapper;
     private final SysRolePermissionMapper rolePermissionMapper;
+    private final SysUserRoleMapper userRoleMapper;
+    private final PermissionCacheStore permissionCacheStore;
 
-    public SysRoleServiceImpl(SysRoleMapper roleMapper, SysRolePermissionMapper rolePermissionMapper) {
+    public SysRoleServiceImpl(SysRoleMapper roleMapper, SysRolePermissionMapper rolePermissionMapper,
+                              SysUserRoleMapper userRoleMapper, PermissionCacheStore permissionCacheStore) {
         this.roleMapper = roleMapper;
         this.rolePermissionMapper = rolePermissionMapper;
+        this.userRoleMapper = userRoleMapper;
+        this.permissionCacheStore = permissionCacheStore;
     }
 
     @Override
@@ -66,11 +73,13 @@ public class SysRoleServiceImpl implements SysRoleService {
         role.setDescription(request.getDescription());
         role.setStatus(request.getStatus() == null ? 1 : request.getStatus());
         roleMapper.update(role);
+        clearUsersCacheByRole(request.getId());
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void delete(Integer id) {
+        clearUsersCacheByRole(id);
         roleMapper.deleteById(id);
     }
 
@@ -91,6 +100,7 @@ public class SysRoleServiceImpl implements SysRoleService {
         // 全量覆盖：先清空旧授权，再插入新授权
         rolePermissionMapper.deleteByRoleId(roleId);
         if (permissionIds == null) {
+            clearUsersCacheByRole(roleId);
             return;
         }
         List<Integer> ids = permissionIds.stream()
@@ -100,6 +110,11 @@ public class SysRoleServiceImpl implements SysRoleService {
         if (!ids.isEmpty()) {
             rolePermissionMapper.batchInsert(roleId, ids);
         }
+        clearUsersCacheByRole(roleId);
+    }
+
+    private void clearUsersCacheByRole(Integer roleId) {
+        permissionCacheStore.removeAll(userRoleMapper.selectUserIdsByRoleId(roleId));
     }
 
     private String requireName(String name) {

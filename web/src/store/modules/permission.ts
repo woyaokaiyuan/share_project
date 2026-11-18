@@ -34,9 +34,10 @@ export const usePermissionStore = defineStore('permission', {
   actions: {
     buildRoutes(userInfo: UserInfo | null) {
       const permissions = userInfo?.permissions || []
+      // 无权限时不放行任何需要权限的路由，避免越权访问
       const accessible = permissions.length
         ? filterRoutes(asyncRoutes, permissions)
-        : asyncRoutes
+        : []
       this.routes = [...constantRoutes, ...accessible]
       return this.routes
     }
