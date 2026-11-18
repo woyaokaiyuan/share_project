@@ -60,3 +60,28 @@ export interface UserForm {
   email: string
   status: number
 }
+
+export interface SysRole {
+  id: number
+  name: string
+  code: string
+  description: string
+  status: number
+  createTime: string
+}
+
+export interface RoleQuery {
+  name: string
+  code: string
+  status: number | ''
+  page: number
+  size: number
+}
+
+export interface RoleForm {
+  id?: number
+  name: string
+  code: string
+  description: string
+  status: number
+}
