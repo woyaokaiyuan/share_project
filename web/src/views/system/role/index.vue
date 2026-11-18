@@ -99,7 +99,9 @@
           :props="{ label: 'name', children: 'children' }"
           node-key="id"
           show-checkbox
+          check-strictly
           default-expand-all
+          @check="handleTreeCheck"
         />
         <el-empty v-else description="暂无权限数据" />
       </div>
@@ -144,7 +146,8 @@ const rules = reactive<FormRules<RoleForm>>({
 
 // 分配权限相关
 interface PermissionTreeRef {
-  setCheckedKeys: (keys: number[]) => void
+  setCheckedKeys: (keys: (string | number)[]) => void
+  setChecked: (key: string | number, checked: boolean, deep?: boolean) => void
   getCheckedKeys: (leafOnly?: boolean) => (string | number)[]
   getHalfCheckedKeys: () => (string | number)[]
 }
@@ -156,6 +159,8 @@ const permSubmitLoading = ref(false)
 const currentRoleId = ref<number | null>(null)
 const permissionTree = ref<PermissionNode[]>([])
 const permTreeRef = ref<PermissionTreeRef>()
+// 程序化设置勾选状态时为 true，避免 @check 递归触发
+const isProgrammaticCheck = ref(false)
 
 function buildPermissionTree(list: SysPermission[]): PermissionNode[] {
   const map = new Map<number, PermissionNode>()
@@ -173,19 +178,81 @@ function buildPermissionTree(list: SysPermission[]): PermissionNode[] {
   return roots
 }
 
-function collectLeafIds(nodes: PermissionNode[]): Set<number> {
-  const leafIds = new Set<number>()
+/** 递归收集某节点的全部后代ID */
+function collectDescendantIds(node: PermissionNode): number[] {
+  const ids: number[] = []
   const walk = (list: PermissionNode[]) => {
-    list.forEach((node) => {
-      if (node.children && node.children.length > 0) {
-        walk(node.children)
-      } else {
-        leafIds.add(node.id)
+    list.forEach((child) => {
+      ids.push(child.id)
+      if (child.children && child.children.length > 0) {
+        walk(child.children)
       }
     })
   }
-  walk(nodes)
-  return leafIds
+  walk(node.children || [])
+  return ids
+}
+
+/** 按 id 建立节点索引，便于沿 parentId 向上追溯祖先 */
+function buildNodeMap(): Map<number, PermissionNode> {
+  const map = new Map<number, PermissionNode>()
+  const walk = (list: PermissionNode[]) => {
+    list.forEach((node) => {
+      map.set(node.id, node)
+      if (node.children && node.children.length > 0) {
+        walk(node.children)
+      }
+    })
+  }
+  walk(permissionTree.value)
+  return map
+}
+
+/** 从当前节点向上收集全部祖先ID（不含自身） */
+function collectAncestorIds(node: PermissionNode): number[] {
+  const nodeMap = buildNodeMap()
+  const ancestorIds: number[] = []
+  let parentId = node.parentId
+  let guard = 0
+  while (parentId && parentId !== 0 && guard++ < 20) {
+    ancestorIds.push(parentId)
+    const parent = nodeMap.get(parentId)
+    if (!parent) break
+    parentId = parent.parentId
+  }
+  return ancestorIds
+}
+
+/** 勾选节点时的联动：目录向下全联动；二三级仅向上联动，取消不回退 */
+function handleTreeCheck(node: PermissionNode, info: { checked: boolean }) {
+  if (isProgrammaticCheck.value) return
+  if (!permTreeRef.value) return
+
+  const isTopDirectory = node.type === 1 || node.parentId === 0
+
+  let targetIds: number[] = []
+  let checked = info.checked
+
+  if (isTopDirectory) {
+    // 一级目录：勾选/取消都联动全部后代
+    targetIds = collectDescendantIds(node)
+  } else if (info.checked) {
+    // 二级菜单、三级按钮：仅在勾选时向上联动祖先
+    targetIds = collectAncestorIds(node)
+    checked = true
+  } else {
+    // 取消二级/三级时不动上级
+    return
+  }
+
+  if (targetIds.length === 0) return
+
+  isProgrammaticCheck.value = true
+  try {
+    targetIds.forEach((id) => permTreeRef.value?.setChecked(id, checked, true))
+  } finally {
+    isProgrammaticCheck.value = false
+  }
 }
 
 async function loadData() {
@@ -275,11 +342,14 @@ async function openPermissionDialog(row: SysRole) {
       getRolePermissionIds(row.id)
     ])
     permissionTree.value = buildPermissionTree(permissions)
-    // 数据库可能存有历史父级ID，只保留叶子节点ID，父级全选/半选由 el-tree 自动推导
-    const leafIds = collectLeafIds(permissionTree.value)
-    const checkedLeafIds = checkedIds.filter((id) => leafIds.has(id))
+    // 独立勾选模式：按数据库保存的权限ID原样回填（含目录、二级菜单、按钮）
     await nextTick()
-    permTreeRef.value?.setCheckedKeys(checkedLeafIds)
+    isProgrammaticCheck.value = true
+    try {
+      permTreeRef.value?.setCheckedKeys(checkedIds)
+    } finally {
+      isProgrammaticCheck.value = false
+    }
   } catch {
     /* 请求拦截器已统一提示错误 */
   } finally {
@@ -289,11 +359,11 @@ async function openPermissionDialog(row: SysRole) {
 
 async function submitPermissions() {
   if (currentRoleId.value == null || !permTreeRef.value) return
-  // 只持久化叶子权限，父级全选/半选由子节点推导，避免状态放大
-  const checkedLeafIds = permTreeRef.value.getCheckedKeys(true) as number[]
+  // 提交所有实际勾选的节点ID（含二级菜单与按钮），二级菜单可独立保存、三级可留空
+  const checkedIds = permTreeRef.value.getCheckedKeys() as number[]
   permSubmitLoading.value = true
   try {
-    await assignRolePermissions(currentRoleId.value, checkedLeafIds)
+    await assignRolePermissions(currentRoleId.value, checkedIds)
     ElMessage.success('权限分配成功')
     permDialogVisible.value = false
   } catch {
