@@ -14,14 +14,3 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv
 }
-
-declare module 'vue-router' {
-  interface RouteMeta {
-    title?: string
-    icon?: string
-    hidden?: boolean
-    affix?: boolean
-    keepAlive?: boolean
-    permission?: string
-  }
-}

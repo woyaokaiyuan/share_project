@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.luwq.mapper.SysUserMapper">
+
+    <resultMap id="BaseResultMap" type="com.luwq.entity.SysUser">
+        <id column="id" property="id"/>
+        <result column="username" property="username"/>
+        <result column="nickname" property="nickname"/>
+        <result column="email" property="email"/>
+        <result column="phone" property="phone"/>
+        <result column="status" property="status"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+        <result column="user_type" property="userType"/>
+        <result column="perm_version" property="permVersion"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, username, nickname, email, phone, status, create_time, update_time, user_type, perm_version
+    </sql>
+
+    <sql id="Query_Where">
+        <where>
+            <if test="username != null and username != ''">
+                AND username LIKE CONCAT('%', #{username}, '%')
+            </if>
+            <if test="status != null">
+                AND status = #{status}
+            </if>
+        </where>
+    </sql>
+
+    <select id="selectPage" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_user
+        <include refid="Query_Where"/>
+        ORDER BY create_time DESC
+        LIMIT #{offset}, #{size}
+    </select>
+
+    <select id="countPage" resultType="long">
+        SELECT COUNT(1) FROM sys_user
+        <include refid="Query_Where"/>
+    </select>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM sys_user
+        WHERE id = #{id}
+    </select>
+
+    <insert id="insert">
+        INSERT INTO sys_user (id, username, password, nickname, email, phone, status, user_type, perm_version)
+        VALUES (#{user.id}, #{user.username}, #{user.password}, #{user.nickname}, #{user.email},
+                #{user.phone}, #{user.status}, #{user.userType}, #{user.permVersion})
+    </insert>
+
+    <update id="update">
+        UPDATE sys_user
+        <set>
+            username = #{user.username},
+            nickname = #{user.nickname},
+            email = #{user.email},
+            phone = #{user.phone},
+            status = #{user.status}
+        </set>
+        WHERE id = #{user.id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM sys_user WHERE id = #{id}
+    </delete>
+
+    <select id="countByUsername" resultType="long">
+        SELECT COUNT(1) FROM sys_user
+        WHERE username = #{username}
+        <if test="excludeId != null and excludeId != ''">
+            AND id &lt;&gt; #{excludeId}
+        </if>
+    </select>
+
+</mapper>

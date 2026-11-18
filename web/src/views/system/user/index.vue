@@ -8,9 +8,14 @@
         </div>
       </template>
 
-      <el-form :inline="true" :model="query" class="search-form">
+      <el-form :inline="true" :model="query" class="search-form" @submit.prevent>
         <el-form-item label="用户名">
-          <el-input v-model="query.username" placeholder="请输入用户名" clearable />
+          <el-input
+            v-model="query.username"
+            placeholder="请输入用户名"
+            clearable
+            @keyup.enter="handleSearch"
+          />
         </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="query.status" placeholder="全部" clearable style="width: 120px">
@@ -25,7 +30,7 @@
       </el-form>
 
       <el-table :data="tableData" border stripe v-loading="loading">
-        <el-table-column prop="id" label="ID" width="80" />
+        <el-table-column prop="id" label="ID" width="190" />
         <el-table-column prop="username" label="用户名" />
         <el-table-column prop="nickname" label="昵称" />
         <el-table-column prop="email" label="邮箱" />
@@ -56,17 +61,17 @@
     </el-card>
 
     <el-dialog v-model="dialogVisible" :title="dialogTitle" width="500px">
-      <el-form :model="form" label-width="80px">
-        <el-form-item label="用户名">
-          <el-input v-model="form.username" />
+      <el-form ref="formRef" :model="form" :rules="rules" label-width="80px">
+        <el-form-item label="用户名" prop="username">
+          <el-input v-model="form.username" placeholder="请输入用户名" />
         </el-form-item>
-        <el-form-item label="昵称">
-          <el-input v-model="form.nickname" />
+        <el-form-item label="昵称" prop="nickname">
+          <el-input v-model="form.nickname" placeholder="请输入昵称" />
         </el-form-item>
-        <el-form-item label="邮箱">
-          <el-input v-model="form.email" />
+        <el-form-item label="邮箱" prop="email">
+          <el-input v-model="form.email" placeholder="请输入邮箱" />
         </el-form-item>
-        <el-form-item label="状态">
+        <el-form-item label="状态" prop="status">
           <el-radio-group v-model="form.status">
             <el-radio :value="1">启用</el-radio>
             <el-radio :value="0">禁用</el-radio>
@@ -75,69 +80,125 @@
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="dialogVisible = false">确定</el-button>
+        <el-button type="primary" :loading="submitLoading" @click="submitForm">确定</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { Plus, Search, Refresh } from '@element-plus/icons-vue'
-
-interface UserRow {
-  id: number
-  username: string
-  nickname: string
-  email: string
-  status: number
-  createTime: string
-}
+import { createUser, deleteUser, getUserList, updateUser } from '@/api/user'
+import type { SysUser, UserForm, UserQuery } from '@/types'
 
 const loading = ref(false)
-const total = ref(5)
+const submitLoading = ref(false)
+const total = ref(0)
 const dialogVisible = ref(false)
 const dialogTitle = ref('新增用户')
-const query = reactive({ username: '', status: '' as number | '', page: 1, size: 10 })
+const formRef = ref<FormInstance>()
 
-const tableData = ref<UserRow[]>([
-  { id: 1, username: 'admin', nickname: '系统管理员', email: 'admin@share.com', status: 1, createTime: '2026-01-01 10:00:00' },
-  { id: 2, username: 'zhangsan', nickname: '张三', email: 'zhangsan@share.com', status: 1, createTime: '2026-02-15 14:30:00' },
-  { id: 3, username: 'lisi', nickname: '李四', email: 'lisi@share.com', status: 0, createTime: '2026-03-08 09:12:00' },
-  { id: 4, username: 'wangwu', nickname: '王五', email: 'wangwu@share.com', status: 1, createTime: '2026-04-20 16:45:00' },
-  { id: 5, username: 'zhaoliu', nickname: '赵六', email: 'zhaoliu@share.com', status: 1, createTime: '2026-05-11 11:20:00' }
-])
+const query = reactive<UserQuery>({ username: '', status: '', page: 1, size: 10 })
+const tableData = ref<SysUser[]>([])
+const form = reactive<UserForm>({ id: '', username: '', nickname: '', email: '', status: 1 })
 
-const form = reactive({ username: '', nickname: '', email: '', status: 1 })
+const rules = reactive<FormRules<UserForm>>({
+  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
+  nickname: [{ required: true, message: '请输入昵称', trigger: 'blur' }],
+  email: [{ type: 'email', message: '请输入正确的邮箱地址', trigger: 'blur' }]
+})
+
+async function loadData() {
+  loading.value = true
+  try {
+    const result = await getUserList(query)
+    tableData.value = result.list
+    total.value = result.total
+  } catch {
+    /* 请求拦截器已统一提示错误 */
+  } finally {
+    loading.value = false
+  }
+}
 
 function handleSearch() {
-  loading.value = true
-  setTimeout(() => { loading.value = false }, 300)
+  query.page = 1
+  loadData()
 }
 
 function resetQuery() {
   query.username = ''
   query.status = ''
   query.page = 1
-  handleSearch()
+  loadData()
 }
 
-function openDialog(row?: UserRow) {
+watch(() => [query.page, query.size], () => {
+  loadData()
+})
+
+async function openDialog(row?: SysUser) {
   dialogTitle.value = row ? '编辑用户' : '新增用户'
-  Object.assign(form, row || { username: '', nickname: '', email: '', status: 1 })
+  Object.assign(
+    form,
+    row
+      ? { id: row.id, username: row.username, nickname: row.nickname, email: row.email, status: row.status }
+      : { id: '', username: '', nickname: '', email: '', status: 1 }
+  )
   dialogVisible.value = true
+  await nextTick()
+  formRef.value?.clearValidate()
 }
 
-async function handleDelete(row: UserRow) {
+async function submitForm() {
+  if (!formRef.value) return
   try {
-    await ElMessageBox.confirm(`确认删除用户「${row.username}」？`, '提示', { type: 'warning' })
-    tableData.value = tableData.value.filter((item) => item.id !== row.id)
-    ElMessage.success('删除成功')
+    await formRef.value.validate()
   } catch {
-    /* 用户取消 */
+    return
+  }
+
+  const isEdit = Boolean(form.id)
+  submitLoading.value = true
+  try {
+    if (isEdit) {
+      await updateUser(form)
+    } else {
+      await createUser(form)
+    }
+    ElMessage.success(isEdit ? '修改成功' : '新增成功')
+    dialogVisible.value = false
+    await loadData()
+  } catch {
+    /* 请求拦截器已统一提示错误 */
+  } finally {
+    submitLoading.value = false
   }
 }
+
+async function handleDelete(row: SysUser) {
+  try {
+    await ElMessageBox.confirm(`确认删除用户「${row.username}」？`, '提示', { type: 'warning' })
+  } catch {
+    return
+  }
+
+  try {
+    await deleteUser(row.id)
+    ElMessage.success('删除成功')
+    if (tableData.value.length === 1 && query.page > 1) {
+      query.page -= 1
+    } else {
+      await loadData()
+    }
+  } catch {
+    /* 请求拦截器已统一提示错误 */
+  }
+}
+
+onMounted(loadData)
 </script>
 
 <style scoped>

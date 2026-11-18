@@ -34,3 +34,29 @@ export interface PageResult<T> {
   list: T[]
   total: number
 }
+
+export interface SysUser {
+  id: string
+  username: string
+  nickname: string
+  email: string
+  phone?: string
+  status: number
+  createTime: string
+  updateTime?: string
+}
+
+export interface UserQuery {
+  username: string
+  status: number | ''
+  page: number
+  size: number
+}
+
+export interface UserForm {
+  id?: string
+  username: string
+  nickname: string
+  email: string
+  status: number
+}
