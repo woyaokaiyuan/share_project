@@ -1,0 +1,47 @@
+services:
+  mysql:
+    image: mysql:8.4.11
+    container_name: sys-manager-mysql
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: lwqlwq
+      MYSQL_DATABASE: sys_manager
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+08:00
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # 自动初始化脚本：挂载 SQL 文件到初始化目录
+      - ./sys_manager/sql/sys_manager.sql:/docker-entrypoint-initdb.d/01-sys_manager.sql:ro
+      # MySQL 客户端字符集配置：容器内 mysql/mysqldump 默认使用 utf8mb4
+      - ./mysql/conf.d/charset.cnf:/etc/mysql/conf.d/charset.cnf:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-plwqlwq"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7.0.12
+    container_name: sys-manager-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    environment:
+      TZ: Asia/Shanghai
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  mysql-data:
+  redis-data:

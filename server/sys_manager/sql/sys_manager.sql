@@ -18,6 +18,8 @@
 --   - 本脚本不包含 DROP TABLE，避免误删已有数据；如需重建请手动处理。
 -- =============================================================
 
+SET NAMES utf8mb4;
+
 CREATE DATABASE IF NOT EXISTS `sys_manager`
   DEFAULT CHARACTER SET utf8mb4
   DEFAULT COLLATE utf8mb4_0900_ai_ci;

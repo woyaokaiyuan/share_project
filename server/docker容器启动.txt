@@ -1,0 +1,11 @@
+启动脚本
+docker compose -f d:/share_project/server/docker-compose.yml up -d
+
+----------------------------------
+删除容器和卷，重新初始化
+docker compose -f d:/share_project/server/docker-compose.yml down -v
+
+
+C=/mnt/d/share_project/server/docker-compose.yml
+docker compose -f "$C" down -v
+docker compose -f "$C" up -d
